@@ -1,12 +1,14 @@
 // ==========================================
 // College MOU Portal - Main Server File
 // ==========================================
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
 const connectDB = require('./config/db');
+
 const authRoutes = require('./routes/auth');
 const postRoutes = require('./routes/posts');
 const responseRoutes = require('./routes/responses');
@@ -18,16 +20,13 @@ const opportunityRoutes = require('./routes/opportunities');
 const app = express();
 
 // ==========================================
-// Connect to MongoDB Database
-// ==========================================
-connectDB();
-
-// ==========================================
 // Middleware
 // ==========================================
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static frontend files
 app.use(express.static(path.join(__dirname, '../public')));
 
 // ==========================================
@@ -45,7 +44,7 @@ app.use('/api/opportunities', opportunityRoutes);
 // Health Check Route
 // ==========================================
 app.get('/api/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     status: 'OK',
     message: 'Server is running',
     timestamp: new Date().toISOString(),
@@ -54,26 +53,29 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==========================================
-// Serve Frontend (All other routes)
+// Serve Frontend
 // ==========================================
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 // ==========================================
-// Global Error Handling Middleware
+// Global Error Handling
 // ==========================================
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.stack);
+
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : {}
+    error: process.env.NODE_ENV === 'development'
+      ? err.message
+      : {}
   });
 });
 
 // ==========================================
-// Handle 404 - Not Found
+// 404 Handler
 // ==========================================
 app.use((req, res) => {
   res.status(404).json({
@@ -87,17 +89,45 @@ app.use((req, res) => {
 // ==========================================
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log('╔═══════════════════════════════════════════╗');
-  console.log(`║   🚀 Server running on port ${PORT}        ║`);
-  console.log(`║   📍 http://localhost:${PORT}              ║`);
-  console.log(`║   🌍 Environment: ${process.env.NODE_ENV || 'development'}            ║`);
-  console.log('╚═══════════════════════════════════════════╝');
+// IMPORTANT FOR RENDER:
+// Bind to 0.0.0.0 so Render can detect the open port.
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log('==========================================');
+  console.log('🚀 College MOU Portal Server Started');
+  console.log(`📡 Port: ${ PORT } `);
+  console.log('🌐 Host: 0.0.0.0');
+  console.log(`🌍 Environment: ${ process.env.NODE_ENV || 'development' } `);
+  console.log('==========================================');
 });
 
-// Handle unhandled promise rejections
+// ==========================================
+// Connect to MongoDB
+// ==========================================
+connectDB()
+  .then((connected) => {
+    if (!connected) return;
+    console.log('✅ MongoDB connection established');
+  })
+  .catch((err) => {
+    console.error('❌ MongoDB connection failed:', err.message);
+  });
+
+// ==========================================
+// Handle Unhandled Promise Rejections
+// ==========================================
 process.on('unhandledRejection', (err) => {
   console.error('❌ Unhandled Promise Rejection:', err);
-  // Close server & exit process
+
+  // Close server gracefully
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+// ==========================================
+// Handle Uncaught Exceptions
+// ==========================================
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
   process.exit(1);
 });

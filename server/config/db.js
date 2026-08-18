@@ -8,7 +8,11 @@ const connectDB = async () => {
     // Disable strict query warnings (Mongoose 7+)
     mongoose.set('strictQuery', false);
 
-    // Connect to MongoDB using the URI from .env
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI is not configured');
+    }
+
+    // Connect to MongoDB using the URI from the environment
     const conn = await mongoose.connect(process.env.MONGODB_URI);
 
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
@@ -48,8 +52,8 @@ const connectDB = async () => {
     console.error('   3. For Atlas, whitelist your IP address');
     console.error('   4. Verify username/password in connection string');
 
-    // Exit with failure code
-    process.exit(1);
+    // Keep the HTTP server available so health checks can report the issue.
+    return false;
   }
 };
 
