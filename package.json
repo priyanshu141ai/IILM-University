@@ -1,0 +1,48 @@
+{
+  "name": "college-mou-portal",
+  "version": "1.0.0",
+  "description": "A full-stack web application for managing international MOUs and opportunities in colleges",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js",
+    "seed": "node server/seed.js"
+  },
+  "keywords": [
+    "mou",
+    "college",
+    "opportunities",
+    "students",
+    "teachers",
+    "education",
+    "international",
+    "nodejs",
+    "express",
+    "mongodb"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^7.5.0",
+    "mongoose": "^7.6.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/college-mou-portal.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/college-mou-portal/issues"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/college-mou-portal#readme"
+}

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher Dashboard - MOU Portal</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <h1 class="logo">👨‍🏫 Teacher Portal</h1>
+      <div class="nav-links">
+        <span id="welcomeText"></span>
+        <button id="notificationButton" class="btn-nav" onclick="toggleNotifications()">🔔 Alerts</button>
+        <details class="account-menu">
+          <summary aria-label="Account menu">⋮</summary>
+          <div class="account-menu-content">
+            <button onclick="deactivateAccount()">Deactivate Account</button>
+            <button class="danger" onclick="deleteAccount()">Delete Account</button>
+            <button onclick="logout()">Log out</button>
+          </div>
+        </details>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container dashboard">
+    <div class="dashboard-header">
+      <div>
+        <h1>My Posts Dashboard</h1>
+        <p style="color: var(--gray); margin-top: 4px;">Create and manage your opportunities</p>
+      </div>
+      <div class="dashboard-actions">
+        <button class="btn btn-primary" onclick="openCreateModal()">+ Create New Post</button>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Total Posts</h3>
+        <div class="number" id="totalPosts">-</div>
+      </div>
+      <div class="stat-card success">
+        <h3>Total Responses</h3>
+        <div class="number" id="totalResponses">-</div>
+      </div>
+      <div class="stat-card warning">
+        <h3>Active Posts</h3>
+        <div class="number" id="activePosts">-</div>
+      </div>
+    </div>
+
+    <div id="postsContainer"></div>
+  </div>
+
+  <div class="modal-overlay" id="createModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Create New Post</h2>
+        <button type="button" class="close-btn" onclick="closeModal('createModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="createForm">
+          <div class="form-group">
+            <label>Title <span class="required">*</span></label>
+            <input type="text" id="title" required placeholder="e.g., Research Internship at MIT">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Type <span class="required">*</span></label>
+              <select id="type" required>
+                <option value="MOU">MOU</option>
+                <option value="Opportunity">Opportunity</option>
+                <option value="Internship">Internship</option>
+                <option value="Exchange Program">Exchange Program</option>
+                <option value="Conference">Conference</option>
+                <option value="Workshop">Workshop</option>
+                <option value="Research">Research</option>
+                <option value="Event">Upcoming Event</option>
+                <option value="Volunteer">Volunteer Call</option>
+                <option value="Announcement">Announcement</option>
+                <option value="Achievement">Achievement &amp; Appreciation</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Deadline <span class="required">*</span></label>
+              <input type="date" id="deadline" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>University/Organization <span class="required">*</span></label>
+              <input type="text" id="university" required placeholder="e.g., MIT">
+            </div>
+            <div class="form-group">
+              <label>Country</label>
+              <input type="text" id="country" value="India" placeholder="e.g., USA">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Eligibility</label>
+            <input type="text" id="eligibility" placeholder="e.g., B.Tech 3rd year, CGPA > 8.0">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Duration</label>
+              <input type="text" id="duration" placeholder="e.g., 3 months">
+            </div>
+            <div class="form-group">
+              <label>Funding/Stipend</label>
+              <input type="text" id="funding" placeholder="e.g., $1000/month">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Description <span class="required">*</span></label>
+            <textarea id="description" rows="5" required placeholder="Detailed description of the opportunity..."></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" onclick="closeModal('createModal')">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="createPost()">Publish Post</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="responsesModal">
+    <div class="modal large">
+      <div class="modal-header">
+        <h2 id="responsesTitle">Student Responses</h2>
+        <button type="button" class="close-btn" onclick="closeModal('responsesModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="responsesContent"></div>
+    </div>
+  </div>
+
+  <script src="js/common.js"></script>
+  <script>
+    if (!checkAuth('teacher')) {}
+    const { token, user } = getAuth();
+    document.getElementById('welcomeText').textContent = `👋 Hi, ${user.prefix ? user.prefix + ' ' : ''}${user.name}`;
+
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function openCreateModal() {
+      document.getElementById('title').value = '';
+      document.getElementById('type').value = 'MOU';
+      document.getElementById('university').value = '';
+      document.getElementById('country').value = 'India';
+      document.getElementById('deadline').value = '';
+      document.getElementById('eligibility').value = '';
+      document.getElementById('duration').value = '';
+      document.getElementById('funding').value = '';
+      document.getElementById('description').value = '';
+      document.getElementById('createModal').classList.add('active');
+    }
+
+    async function loadMyPosts() {
+      const container = document.getElementById('postsContainer');
+      container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      try {
+        const res = await fetch(`${API_BASE}/posts/teacher/my-posts`, {
+          headers: { 'Authorization': `****** }
+        });
+        const data = await res.json();
+        document.getElementById('totalPosts').textContent = data.count;
+        const totalRes = data.posts.reduce((sum, p) => sum + p.responseCount, 0);
+        document.getElementById('totalResponses').textContent = totalRes;
+        const now = new Date();
+        const active = data.posts.filter(p => new Date(p.deadline) > now && p.isActive).length;
+        document.getElementById('activePosts').textContent = active;
+
+        if (data.posts.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="icon">📝</div><h3>No posts yet</h3><p>Create your first post to get started!</p><button class="btn btn-primary" style="margin-top: 16px;" onclick="openCreateModal()">Create Post</button></div>';
+          return;
+        }
+
+        container.innerHTML = `<div class="posts-grid">${data.posts.map(post => {
+          const expired = new Date(post.deadline) < new Date();
+          return `
+            <div class="post-card">
+              <span class="post-badge badge-${post.type.toLowerCase().replace(' ', '')}">${escapeHtml(post.type)}${post.isActive ? '' : ' (Deleted)'}</span>
+              <h3>${escapeHtml(post.title)}</h3>
+              <div class="meta">
+                <div class="meta-item">🏛️ ${escapeHtml(post.university)}, ${escapeHtml(post.country)}</div>
+                <div class="meta-item">📅 ${formatDate(post.deadline)} ${expired ? '<span style="color:var(--danger)">(Expired)</span>' : ''}</div>
+                <div class="meta-item">👁️ ${post.views || 0} views</div>
+              </div>
+              <p class="description">${escapeHtml(post.description.substring(0, 120))}...</p>
+              <div class="footer">
+                <span class="response-count">👥 ${post.responseCount} responses</span>
+                <span style="font-size: 0.8rem; color: var(--gray);">${formatDate(post.createdAt)}</span>
+              </div>
+              <div class="post-actions">
+                <button class="btn btn-success btn-sm" onclick="viewResponses('${post._id}','${escapeHtml(post.title).replace(/'/g, "\\'")}')">View Responses</button>
+                <button class="btn btn-danger btn-sm" onclick="deletePost('${post._id}')">Delete</button>
+              </div>
+            </div>
+          `;
+        }).join('')}</div>`;
+      } catch (err) {
+        container.innerHTML = '<div class="alert alert-error">Failed to load posts</div>';
+      }
+    }
+
+    async function createPost() {
+      const payload = {
+        title: document.getElementById('title').value.trim(),
+        type: document.getElementById('type').value,
+        university: document.getElementById('university').value.trim(),
+        country: document.getElementById('country').value.trim() || 'India',
+        deadline: document.getElementById('deadline').value,
+        eligibility: document.getElementById('eligibility').value.trim(),
+        duration: document.getElementById('duration').value.trim(),
+        funding: document.getElementById('funding').value.trim(),
+        description: document.getElementById('description').value.trim()
+      };
+      if (!payload.title || !payload.university || !payload.deadline || !payload.description) {
+        showToast('Please fill all required fields', 'error');
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/posts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `****** },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.message, 'error'); return; }
+        showToast('Post published successfully! 🎉', 'success');
+        closeModal('createModal');
+        loadMyPosts();
+      } catch (err) { showToast('Failed to create post', 'error'); }
+    }
+
+    async function viewResponses(postId, title) {
+      document.getElementById('responsesTitle').textContent = `Responses: ${title}`;
+      const content = document.getElementById('responsesContent');
+      content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      document.getElementById('responsesModal').classList.add('active');
+
+      try {
+        const res = await fetch(`${API_BASE}/responses/post/${postId}`, {
+          headers: { 'Authorization': `****** }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to fetch responses');
+        if (data.responses.length === 0) {
+          content.innerHTML = '<div class="empty-state"><div class="icon">👥</div><h3>No responses yet</h3><p>Students haven\'t expressed interest yet</p></div>';
+          return;
+        }
+        content.innerHTML = `
+          <div style="margin-bottom: 16px; padding: 12px; background: #e8f4fd; border-radius: 8px; color: #1a5490;">
+            <strong>📊 Total Responses: ${data.count}</strong>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Name</th><th>Email</th><th>ID</th><th>Dept</th><th>Phone</th><th>Message</th><th>Status</th><th>Date</th></tr></thead>
+              <tbody>${data.responses.map(r => `
+                <tr>
+                  <td><strong>${escapeHtml(r.studentName)}</strong></td>
+                  <td>${escapeHtml(r.studentEmail)}</td>
+                  <td>${escapeHtml(r.studentId) || '-'}</td>
+                  <td>${escapeHtml(r.department) || '-'}</td>
+                  <td>${escapeHtml(r.phone) || '-'}</td>
+                  <td style="max-width: 200px; font-size: 0.85rem;">${escapeHtml(r.message) || '-'}</td>
+                  <td>
+                    <select onchange="updateStatus('${r._id}', this.value)" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #ddd;">
+                      <option ${r.status === 'Interested' ? 'selected' : ''}>Interested</option>
+                      <option ${r.status === 'Applied' ? 'selected' : ''}>Applied</option>
+                      <option ${r.status === 'Shortlisted' ? 'selected' : ''}>Shortlisted</option>
+                      <option ${r.status === 'Selected' ? 'selected' : ''}>Selected</option>
+                      <option ${r.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+                    </select>
+                  </td>
+                  <td>${formatDate(r.createdAt)}</td>
+                </tr>
+              `).join('')}</tbody>
+            </table>
+          </div>`;
+      } catch (err) {
+        content.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message || 'Failed to load responses')}</div>`;
+      }
+    }
+
+    async function updateStatus(id, status) {
+      try {
+        const res = await fetch(`${API_BASE}/responses/${id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `****** },
+          body: JSON.stringify({ status })
+        });
+        if (res.ok) showToast('Status updated', 'success');
+        else showToast('Failed to update', 'error');
+      } catch (err) { showToast('Connection error', 'error'); }
+    }
+
+    async function deletePost(id) {
+      if (!confirm('Are you sure you want to delete this post?')) return;
+      try {
+        const res = await fetch(`${API_BASE}/posts/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `****** }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Post deleted', 'success');
+          loadMyPosts();
+        } else showToast(data.message || 'Failed to delete post', 'error');
+      } catch (err) { showToast('Failed to delete', 'error'); }
+    }
+
+    loadMyPosts();
+  </script>
+</body>
+</html>

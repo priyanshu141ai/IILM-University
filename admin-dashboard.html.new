@@ -1,0 +1,315 @@
+<!-- DEPRECATED: admin-dashboard.html.new — DO NOT USE. The active admin dashboard is public/admin-dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - MOU Portal</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <h1 class="logo"> Admin Portal</h1>
+      <div class="nav-links">
+        <span id="welcomeText"></span>
+        <button id="notificationButton" class="btn-nav" onclick="toggleNotifications()"> Alerts</button>
+        <button class="btn-nav" onclick="logout()">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container dashboard">
+    <div class="dashboard-header">
+      <h1>Admin Dashboard</h1>
+      <button class="btn btn-primary" onclick="openAdminPostModal()">+ Publish News / Event</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showSection('overview', this)"> Overview</button>
+      <button class="tab" onclick="showSection('users', this)"> Users</button>
+      <button class="tab" onclick="showSection('posts', this)"> Posts</button>
+      <button class="tab" onclick="showSection('opportunities', this)">🌐 Opportunities</button>
+      <button class="tab" onclick="showSection('responses', this)"> Responses</button>
+    </div>
+
+    <div id="overviewSection">
+      <div class="stats-grid" id="statsGrid"></div>
+      <h2 style="margin: 30px 0 16px; color: var(--dark);">Recent Activity</h2>
+      <h3 style="margin: 16px 0 12px; color: var(--gray); font-size: 1rem;">Latest Posts</h3>
+      <div id="recentPosts" class="posts-grid"></div>
+    </div>
+
+    <div id="usersSection" style="display:none">
+      <div class="filter-bar">
+        <select id="userRoleFilter" onchange="loadUsers()">
+          <option value="">All Roles</option>
+          <option value="student">Students</option>
+          <option value="teacher">Teachers</option>
+          <option value="admin">Admins</option>
+          <option value="ir_admin">IR Admins</option>
+          <option value="super_admin">Super Admins</option>
+        </select>
+      </div>
+      <div class="table-container">
+        <table id="usersTable">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>ID</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="postsSection" style="display:none">
+      <div id="allPosts" class="posts-grid"></div>
+    </div>
+
+    <div id="opportunitiesSection" style="display:none">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <h2 style="margin:0;">Opportunities</h2>
+        <div>
+          <select id="oppStatusFilter" onchange="loadAllOpportunities()" style="margin-right:8px;"><option value="">All statuses</option><option value="Draft">Draft</option><option value="Published">Published</option><option value="Closed">Closed</option><option value="Archived">Archived</option></select>
+          <button class="btn btn-primary" onclick="openAdminOpportunityModal()">+ Create Opportunity</button>
+        </div>
+      </div>
+      <div id="allOpportunities" class="posts-grid"></div>
+    </div>
+
+    <div id="responsesSection" style="display:none">
+      <div class="table-container">
+        <table id="responsesTable">
+          <thead><tr><th>Student</th><th>Email</th><th>Department</th><th>Post</th><th>Type</th><th>University</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="adminPostModal">
+    <div class="modal">
+      <div class="modal-header"><h2>Publish IILM Information</h2><button type="button" class="close-btn" onclick="closeModal('adminPostModal')">&times;</button></div>
+      <div class="modal-body">
+        <div id="adminPostAlert"></div>
+        <div class="form-group"><label>Category <span class="required">*</span></label><select id="adminPostType"><option value="Event">Upcoming Event</option><option value="Volunteer">Volunteer Call</option><option value="Announcement">Announcement</option><option value="Achievement">Achievement &amp; Appreciation</option><option value="MOU">MOU</option><option value="Opportunity">Opportunity</option></select></div>
+        <div class="form-group"><label>Headline <span class="required">*</span></label><input id="adminPostTitle" placeholder="e.g., IILM Annual Sports Meet 2026"></div>
+        <div class="form-group"><label>Organization / Venue <span class="required">*</span></label><input id="adminPostUniversity" placeholder="IILM University, Gurugram"></div>
+        <div class="form-group"><label>Event / Information Date <span class="required">*</span></label><input id="adminPostDeadline" type="date"></div>
+        <div class="form-group"><label>Full details <span class="required">*</span></label><textarea id="adminPostDescription" rows="5" placeholder="Share the details, participation instructions, or achievement to celebrate."></textarea></div>
+        <div class="form-group"><label>Eligibility / participation details</label><input id="adminPostEligibility" placeholder="Open to all IILM students"></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('adminPostModal')">Cancel</button><button type="button" class="btn btn-primary" onclick="publishAdminPost()">Publish</button></div>
+    </div>
+  </div>
+
+  <script src="js/common.fixed.js"></script>
+  <script>
+    if (!checkAuth('admin')) {}
+    const { token, user } = getAuth();
+    document.getElementById('welcomeText').textContent = ` Hi, ${user.name}`;
+
+    function openAdminPostModal() {
+      ['adminPostTitle', 'adminPostUniversity', 'adminPostDeadline', 'adminPostDescription', 'adminPostEligibility'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('adminPostType').value = 'Event';
+      document.getElementById('adminPostAlert').innerHTML = '';
+      document.getElementById('adminPostModal').classList.add('active');
+    }
+    async function publishAdminPost() {
+      const payload = {
+        type: document.getElementById('adminPostType').value,
+        title: document.getElementById('adminPostTitle').value.trim(),
+        university: document.getElementById('adminPostUniversity').value.trim(),
+        deadline: document.getElementById('adminPostDeadline').value,
+        description: document.getElementById('adminPostDescription').value.trim(),
+        eligibility: document.getElementById('adminPostEligibility').value.trim()
+      };
+      const alertBox = document.getElementById('adminPostAlert');
+      if (!payload.title || !payload.university || !payload.deadline || !payload.description) {
+        alertBox.innerHTML = '<div class="alert alert-error">Please complete all required fields.</div>'; return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/posts`, { method: 'POST', headers: authHeaders('application/json'), body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) { alertBox.innerHTML = `<div class="alert alert-error">${escapeHtml(data.message)}</div>`; return; }
+        showToast('Information published successfully', 'success');
+        closeModal('adminPostModal');
+        loadStats();
+        loadAllPosts();
+      } catch (error) { alertBox.innerHTML = '<div class="alert alert-error">Failed to publish. Please try again.</div>'; }
+    }
+
+    function showSection(section, btn) {
+      ['overview', 'users', 'posts', 'responses'].forEach(s => {
+        document.getElementById(s + 'Section').style.display = s === section ? 'block' : 'none';
+      });
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      if (section === 'users') loadUsers();
+      if (section === 'posts') loadAllPosts();
+      if (section === 'opportunities') loadAllOpportunities();
+      if (section === 'responses') loadAllResponses();
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/stats`, {
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        const s = data.stats;
+        document.getElementById('statsGrid').innerHTML = `
+          <div class="stat-card"><h3>Students</h3><div class="number">${s.totalStudents}</div></div>
+          <div class="stat-card success"><h3>Teachers</h3><div class="number">${s.totalTeachers}</div></div>
+          <div class="stat-card warning"><h3>Active Posts</h3><div class="number">${s.totalPosts}</div></div>
+          <div class="stat-card danger"><h3>Total Responses</h3><div class="number">${s.totalResponses}</div></div>
+        `;
+        document.getElementById('recentPosts').innerHTML = s.recentPosts.length ? s.recentPosts.map(p => `
+          <div class="post-card">
+            <span class="post-badge badge-${p.type.toLowerCase().replace(' ', '')}">${escapeHtml(p.type)}</span>
+            <h3>${escapeHtml(p.title)}</h3>
+            <div class="meta">
+              <div class="meta-item"> ${escapeHtml(p.university)}</div>
+              <div class="meta-item"> ${escapeHtml(p.postedBy?.name || 'N/A')}</div>
+              <div class="meta-item"> ${p.responseCount} responses</div>
+            </div>
+          </div>
+        `).join('') : '<p style="color: var(--gray);">No posts yet</p>';
+      } catch (err) { showToast('Failed to load stats', 'error'); }
+    }
+
+    async function loadUsers() {
+      const role = document.getElementById('userRoleFilter').value;
+      try {
+        const res = await fetch(`${API_BASE}/admin/users${role ? '?role=' + role : ''}`, {
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        const tbody = document.querySelector('#usersTable tbody');
+        if (data.users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 30px; color: var(--gray);">No users found</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.users.map(u => `
+          <tr>
+            <td><strong>${escapeHtml(u.name)}</strong></td>
+            <td>${escapeHtml(u.email)}</td>
+            <td><span class="status-badge status-${ADMIN_ROLES.includes(u.role) ? 'selected' : u.role === 'teacher' ? 'shortlisted' : 'interested'}">${u.role}</span></td>
+            <td>${escapeHtml(u.department) || '-'}</td>
+            <td>${escapeHtml(u.studentId) || escapeHtml(u.employeeId) || '-'}</td>
+            <td>${u.isActive ? '<span style="color: var(--success);"> Active</span>' : '<span style="color: var(--danger);"> Inactive</span>'}</td>
+            <td>${formatDate(u.createdAt)}</td>
+            <td>
+              <button class="btn btn-sm btn-warning" onclick="toggleUser('${u._id}')">${u.isActive ? 'Deactivate' : 'Activate'}</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) { showToast('Failed to load users', 'error'); }
+    }
+
+    async function toggleUser(id) {
+      if (!confirm('Toggle this user status?')) return;
+      try {
+        await fetch(`${API_BASE}/admin/users/${id}/toggle`, {
+          method: 'PUT',
+          headers: authHeaders()
+        });
+        showToast('User status updated', 'success');
+        loadUsers();
+      } catch (err) { showToast('Failed to update', 'error'); }
+    }
+
+    async function loadAllPosts() {
+      const container = document.getElementById('allPosts');
+      container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      try {
+        const res = await fetch(`${API_BASE}/admin/posts`, {
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (data.posts.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="icon"></div><h3>No posts yet</h3></div>';
+          return;
+        }
+        container.innerHTML = data.posts.map(p => `
+          <div class="post-card">
+            <span class="post-badge badge-${p.type.toLowerCase().replace(' ', '')}">${escapeHtml(p.type)}</span>
+            <h3>${escapeHtml(p.title)}</h3>
+            <div class="meta">
+              <div class="meta-item"> ${escapeHtml(p.university)}, ${escapeHtml(p.country)}</div>
+              <div class="meta-item"> ${escapeHtml(p.postedBy?.name || 'N/A')} (${escapeHtml(p.postedBy?.role) || 'unknown'})</div>
+              <div class="meta-item"> Deadline: ${formatDate(p.deadline)}</div>
+              <div class="meta-item"> ${p.responseCount} responses |  ${p.views || 0} views</div>
+              <div class="meta-item">${p.isActive ? ' Active' : ' Inactive'}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) { container.innerHTML = '<div class="alert alert-error">Failed to load</div>'; }
+    }
+
+    // ==============================
+    // Opportunities admin functions
+    // ==============================
+
+    function openAdminOpportunityModal(opportunity = null) {
+      // create modal if not exists
+      if (!document.getElementById('adminOpportunityModal')) {
+        const html = `
+        <div class="modal-overlay" id="adminOpportunityModal">
+          <div class="modal large">
+            <div class="modal-header"><h2 id="oppModalTitle">Create Opportunity</h2><button type="button" class="close-btn" onclick="closeModal('adminOpportunityModal')">&times;</button></div>
+            <div class="modal-body">
+              <div id="adminOppAlert"></div>
+              <div class="form-row">
+                <div class="form-group"><label>Title *</label><input id="oppTitle"></div>
+                <div class="form-group"><label>Type *</label><select id="oppType"></select></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Partner</label><select id="oppPartner"><option value="">-- None --</option></select></div>
+                <div class="form-group"><label>Country</label><input id="oppCountry"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Application Deadline</label><input type="date" id="oppDeadline"></div>
+                <div class="form-group"><label>Featured</label><select id="oppFeatured"><option value="false">No</option><option value="true">Yes</option></select></div>
+              </div>
+              <div class="form-group"><label>Short Description</label><textarea id="oppShort" rows="3"></textarea></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-light" onclick="closeModal('adminOpportunityModal')">Cancel</button><button class="btn btn-primary" id="oppSaveBtn">Save</button></div>
+          </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+      }
+
+      // populate type dropdown
+      const typeSelect = document.getElementById('oppType');
+      typeSelect.innerHTML = '';
+      const types = 
+
+    async function loadAllResponses() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/responses`, {
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to load responses');
+        const tbody = document.querySelector('#responsesTable tbody');
+        if (data.responses.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 30px; color: var(--gray);">No responses yet</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.responses.map(r => `
+          <tr>
+            <td><strong>${escapeHtml(r.student?.name || 'N/A')}</strong></td>
+            <td>${escapeHtml(r.student?.email || 'N/A')}</td>
+            <td>${escapeHtml(r.student?.department) || '-'}</td>
+            <td>${escapeHtml(r.post?.title || 'N/A')}</td>
+            <td>${escapeHtml(r.post?.type) || '-'}</td>
+            <td>${escapeHtml(r.post?.university) || '-'}</td>
+            <td><span class="status-badge status-${r.status.toLowerCase()}">${r.status}</span></td>
+            <td>${formatDate(r.createdAt)}</td>
+          </tr>
+        `).join('');
+      } catch (err) { showToast('Failed to load responses', 'error'); }
+    }
+
+    loadStats();
+  </script>
+</body>
+</html>

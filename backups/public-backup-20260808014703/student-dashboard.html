@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard - MOU Portal</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <h1 class="logo">🎓 Student Portal</h1>
+      <div class="nav-links">
+        <span id="welcomeText"></span>
+        <button id="notificationButton" class="btn-nav" onclick="toggleNotifications()">🔔 Alerts</button>
+        <details class="account-menu">
+          <summary aria-label="Account menu">⋮</summary>
+          <div class="account-menu-content">
+            <button onclick="deactivateAccount()">Deactivate Account</button>
+            <button class="danger" onclick="deleteAccount()">Delete Account</button>
+            <button onclick="logout()">Log out</button>
+          </div>
+        </details>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container dashboard">
+    <div class="dashboard-header">
+      <div>
+        <h1>Explore Opportunities 🌍</h1>
+        <p style="color: var(--gray); margin-top: 4px;">Discover international MOUs, internships, and programs</p>
+      </div>
+      <div class="dashboard-actions">
+        <button class="btn btn-info" onclick="showMyResponses()">📋 My Responses</button>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Available Posts</h3>
+        <div class="number" id="totalPosts">-</div>
+      </div>
+      <div class="stat-card success">
+        <h3>My Responses</h3>
+        <div class="number" id="myResponses">-</div>
+      </div>
+      <div class="stat-card warning">
+        <h3>Active Opportunities</h3>
+        <div class="number" id="activeOpp">-</div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="🔍 Search by title, university, country..." oninput="debounce(loadPosts, 400)">
+      <select id="typeFilter" onchange="loadPosts()">
+        <option value="">All Categories</option>
+        <option value="MOU">MOU</option>
+        <option value="Opportunity">Opportunity</option>
+        <option value="Internship">Internship</option>
+        <option value="Exchange Program">Exchange Program</option>
+        <option value="Conference">Conference</option>
+        <option value="Workshop">Workshop</option>
+        <option value="Research">Research</option>
+        <option value="Event">Upcoming Event</option>
+        <option value="Volunteer">Volunteer Call</option>
+        <option value="Announcement">Announcement</option>
+        <option value="Achievement">Achievement</option>
+      </select>
+    </div>
+
+    <div id="postsContainer"></div>
+  </div>
+
+  <div class="modal-overlay" id="responseModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Express Your Interest</h2>
+        <button type="button" class="close-btn" onclick="closeModal('responseModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="postPreview"></div>
+        <form id="responseForm" style="margin-top: 20px;">
+          <input type="hidden" id="postId">
+          <div class="form-group">
+            <label>Why are you interested? (Optional)</label>
+            <textarea id="message" rows="4" placeholder="Briefly describe your motivation..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" id="phone" placeholder="Your contact number">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" onclick="closeModal('responseModal')">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitResponse()">Submit Response</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="myResponsesModal">
+    <div class="modal large">
+      <div class="modal-header">
+        <h2>📋 My Responses</h2>
+        <button type="button" class="close-btn" onclick="closeModal('myResponsesModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="myResponsesList"></div>
+    </div>
+  </div>
+
+  <script src="js/common.fixed.js"></script>
+  <script>
+    if (!checkAuth('student')) {}
+    const { token, user } = getAuth();
+    document.getElementById('welcomeText').textContent = `👋 Hi, ${user.prefix ? user.prefix + ' ' : ''}${user.name}`;
+
+    let debounceTimer;
+    function debounce(fn, delay) {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fn, delay);
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    async function loadPosts() {
+      const container = document.getElementById('postsContainer');
+      container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading opportunities...</div>';
+
+      const search = document.getElementById('searchInput').value;
+      const type = document.getElementById('typeFilter').value;
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (type) params.append('type', type);
+
+      try {
+        const res = await fetch(`${API_BASE}/posts?${params}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        document.getElementById('totalPosts').textContent = data.count;
+
+        if (data.posts.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><h3>No opportunities found</h3><p>Try adjusting your filters</p></div>';
+          return;
+        }
+
+        const now = new Date();
+        const activeCount = data.posts.filter(p => new Date(p.deadline) > now).length;
+        document.getElementById('activeOpp').textContent = activeCount;
+
+        container.innerHTML = `<div class="posts-grid">${data.posts.map(post => {
+          const isExpired = new Date(post.deadline) < now;
+          const badgeClass = post.type.toLowerCase().replace(' ', '');
+          return `
+            <div class="post-card">
+              <span class="post-badge badge-${badgeClass}">${escapeHtml(post.type)}</span>
+              <h3>${escapeHtml(post.title)}</h3>
+              <div class="meta">
+                <div class="meta-item">🏛️ <strong>${escapeHtml(post.university)}</strong>, ${escapeHtml(post.country)}</div>
+                <div class="meta-item">📅 Deadline: ${formatDate(post.deadline)} ${isExpired ? '<span style="color:var(--danger)">(Expired)</span>' : ''}</div>
+                <div class="meta-item">👤 Posted by: ${escapeHtml(post.postedByName)}</div>
+                <div class="meta-item">👥 ${post.responseCount} student(s) interested</div>
+                ${post.funding ? `<div class="meta-item">💰 ${escapeHtml(post.funding)}</div>` : ''}
+              </div>
+              <p class="description">${escapeHtml(post.description.substring(0, 150))}...</p>
+              <div class="post-actions">
+                ${isExpired ? '<button class="btn btn-light" disabled>Expired</button>' : `<button class="btn btn-primary" onclick="openResponseModal('${post._id}','${escapeHtml(post.title).replace(/'/g, "\\'")}','${escapeHtml(post.university).replace(/'/g, "\\'")}')">I'm Interested</button>`}
+              </div>
+            </div>
+          `;
+        }).join('')}</div>`;
+      } catch (err) {
+        container.innerHTML = '<div class="alert alert-error">Failed to load posts. Please refresh.</div>';
+      }
+    }
+
+    function openResponseModal(postId, title, university) {
+      document.getElementById('postId').value = postId;
+      document.getElementById('postPreview').innerHTML = `
+        <div style="padding: 12px; background: #f8f9fc; border-radius: 8px; border-left: 3px solid var(--primary);">
+          <strong>${escapeHtml(title)}</strong><br>
+          <small style="color: var(--gray);">${escapeHtml(university)}</small>
+        </div>`;
+      document.getElementById('message').value = '';
+      document.getElementById('phone').value = '';
+      document.getElementById('responseModal').classList.add('active');
+    }
+
+    async function submitResponse() {
+      const postId = document.getElementById('postId').value;
+      const message = document.getElementById('message').value;
+      const phone = document.getElementById('phone').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/responses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ postId, message, phone })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.message, 'error'); return; }
+        showToast('Response submitted successfully! 🎉', 'success');
+        closeModal('responseModal');
+        loadPosts();
+        loadMyStats();
+      } catch (err) { showToast('Connection error', 'error'); }
+    }
+
+    async function showMyResponses() {
+      const list = document.getElementById('myResponsesList');
+      list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      document.getElementById('myResponsesModal').classList.add('active');
+
+      try {
+        const res = await fetch(`${API_BASE}/responses/my-responses`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to load responses');
+        if (data.responses.length === 0) {
+          list.innerHTML = '<div class="empty-state"><div class="icon">📭</div><h3>No responses yet</h3><p>Start by expressing interest in some opportunities!</p></div>';
+          return;
+        }
+        list.innerHTML = `<div class="table-container"><table>
+          <thead><tr><th>Title</th><th>Type</th><th>University</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+          <tbody>${data.responses.map(r => `
+            <tr>
+              <td><strong>${escapeHtml(r.post?.title || 'Post removed')}</strong></td>
+              <td>${escapeHtml(r.post?.type) || '-'}</td>
+              <td>${escapeHtml(r.post?.university) || '-'}</td>
+              <td><span class="status-badge status-${r.status.toLowerCase()}">${r.status}</span></td>
+              <td>${formatDate(r.createdAt)}</td>
+              <td>${(r.status === 'Interested' || r.status === 'Applied') ? `<button class="btn btn-sm btn-danger" onclick="withdrawResponse('${r._id}')">Withdraw</button>` : '-'}</td>
+            </tr>
+          `).join('')}</tbody>
+        </table></div>`;
+      } catch (err) {
+        list.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message || 'Failed to load responses')}</div>`;
+      }
+    }
+
+    async function withdrawResponse(id) {
+      if (!confirm('Withdraw this response?')) return;
+      try {
+        const res = await fetch(`${API_BASE}/responses/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Response withdrawn', 'success');
+          showMyResponses();
+          loadMyStats();
+          loadPosts();
+        } else showToast(data.message || 'Failed to withdraw response', 'error');
+      } catch (err) { showToast('Failed to withdraw', 'error'); }
+    }
+
+    async function loadMyStats() {
+      try {
+        const res = await fetch(`${API_BASE}/responses/my-responses`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        document.getElementById('myResponses').textContent = data.count;
+      } catch (err) {}
+    }
+
+    loadPosts();
+    loadMyStats();
+  </script>
+</body>
+</html>

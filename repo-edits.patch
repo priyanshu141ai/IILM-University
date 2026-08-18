@@ -1,0 +1,31 @@
+This patch package contains the edited dashboard files as full replacements.
+
+Files included (in this folder):
+- admin-dashboard.html.new
+- student-dashboard.html.new
+- teacher-dashboard.html.new
+
+These .new files are the updated copies produced during the "centralize auth headers" edits. They are provided so you can review and apply them locally.
+
+How to apply (recommended, Windows PowerShell):
+1) Backup current files (optional but recommended):
+   copy .\public\admin-dashboard.html .\backups\admin-dashboard.html.bak
+   copy .\public\student-dashboard.html .\backups\student-dashboard.html.bak
+   copy .\public\teacher-dashboard.html .\backups\teacher-dashboard.html.bak
+
+2) Overwrite with updated files provided here:
+   copy .\admin-dashboard.html.new .\public\admin-dashboard.html /Y
+   copy .\student-dashboard.html.new .\public\student-dashboard.html /Y
+   copy .\teacher-dashboard.html.new .\public\teacher-dashboard.html /Y
+
+3) (Optional) Create a git commit and patch locally:
+   git init   # if repo not already initialized
+   git add public\admin-dashboard.html public\student-dashboard.html public\teacher-dashboard.html
+   git commit -m "fix: centralize Authorization headers and fix malformed fetch() calls in dashboards\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+   git format-patch -1 HEAD --stdout > fix-centralize-auth-headers.patch
+
+Notes / caveats:
+- The provided .new files reflect the current edited state in this workspace. Some previously-remaining malformed fragments (e.g., stray placeholder tokens like `******`) have been left in a few places where manual confirmation of the desired behavior was required. Please search the replaced files for "******" and remove or correct those fragments if necessary.
+- Before running the app, run local smoke tests (npm install, npm run dev) and test flows in the browser. Verify Authorization headers are added as expected in DevTools Network tab.
+
+If you'd prefer a single unified git-style .diff file (git apply ready), reply and I will attempt to generate a unified diff string instead. Otherwise, apply the .new files as shown above.

@@ -1,0 +1,75 @@
+Summary of changes made:
+
+- Replaced inline Authorization headers and fixed malformed fetch() calls in the following files:
+  - public/admin-dashboard.html
+  - public/student-dashboard.html
+  - public/teacher-dashboard.html
+- Ensured POST/PUT requests use authHeaders('application/json') where appropriate.
+- Left centralized helper files intact (public/js/common.js and public/js/common.fixed.js) — these provide authHeaders() and inject Authorization into fetch when needed.
+- Backups of original files exist under backups/public-backup-20260808014703
+
+Recommended git workflow (run locally in the repository root):
+
+# If this directory isn't a git repo yet (it appears not to be), initialize and create a branch
+git init
+git checkout -b fix/centralize-auth-headers
+
+# Stage the files that were edited
+git add public/admin-dashboard.html public/student-dashboard.html public/teacher-dashboard.html
+
+# Commit with the message and Co-authored-by trailer
+git commit -m "fix: centralize auth headers and fix malformed fetch calls in dashboards" -m "
+- Replace inline Authorization headers with authHeaders() in dashboard pages
+- Fix syntax errors in fetch() option objects
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+"
+
+# Push (if you have a remote)
+git push -u origin HEAD
+
+If this is already a git repo, just create the branch and run the git add/commit commands above instead of git init.
+
+Smoke-test steps (run locally):
+
+1) Install dependencies
+   npm install
+
+2) Create .env from example and set MONGODB_URI (and any other required env vars). Example:
+   copy .env.example .env
+   # then edit .env and provide valid MONGODB_URI and other secrets
+
+3) Start the server (development)
+   npm run dev
+
+4) Verify server is up
+   # In PowerShell or terminal:
+   curl http://localhost:5000/api/health
+   # Expected: JSON with status: OK
+
+5) Manually exercise flows in the browser:
+   - Open http://localhost:5000 in browser
+   - Login with a seeded user (or create an account)
+   - Navigate to Student / Teacher / Admin dashboards
+   - Create a post (teacher/admin flow) and submit a response (student flow)
+   - Observe that network requests carry Authorization via the centralized helper (check devtools Network tab)
+
+Quick checks for leftover Authorization occurrences (PowerShell):
+
+# From repository root in PowerShell
+Select-String -Path .\public\**\*.html, .\public\**\*.js -Pattern "Authorization" -SimpleMatch | Format-Table Path, LineNumber, Line -AutoSize
+
+Or in Git Bash / WSL / Linux:
+
+grep -R --line-number "Authorization" public || true
+
+Notes & caveats:
+- PowerShell was not available in the editing environment used by the assistant, so the original replace-auth-headers.ps1 script could not be re-run here. Edits were made directly to the files and backups are available in backups/public-backup-20260808014703.
+- Please run the smoke-tests above locally (npm install + npm run dev) — I can't start processes in your environment from here.
+
+If you want, next steps I can do for you:
+- Create a git patch (.diff) file capturing the exact edits so you can apply it locally (I can generate it here and save to files/).
+- Produce a concise diff snippet in the message for quick review.
+- Attempt to run the original PowerShell script locally (I can provide the exact command) to re-run the replacements and generate backups.
+
+Which of the above should I do next? (Options: create patch file, show diff snippet, provide commands to run tests)

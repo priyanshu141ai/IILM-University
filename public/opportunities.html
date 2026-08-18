@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>International Opportunities - IILM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1>International Opportunities</h1>
+      <p class="lead">Search internships, exchange programs, scholarships and more</p>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="filter-bar">
+      <input id="searchInput" placeholder="Search internships, exchange programs, scholarships..." oninput="debounce(loadOpportunities, 400)" />
+      <select id="typeFilter" onchange="loadOpportunities()"><option value="">All Types</option></select>
+      <select id="countryFilter" onchange="loadOpportunities()"><option value="">All Countries</option></select>
+      <select id="programFilter" onchange="loadOpportunities()"><option value="">All Programs</option></select>
+      <select id="deptFilter" onchange="loadOpportunities()"><option value="">All Departments</option></select>
+      <select id="deadlineFilter" onchange="loadOpportunities()">
+        <option value="">Any Deadline</option>
+        <option value="closing7">Closing within 7 days</option>
+        <option value="closing30">Closing within 30 days</option>
+        <option value="closing60">Closing within 60 days</option>
+        <option value="expired">Expired</option>
+      </select>
+    </div>
+
+    <section id="featuredSection">
+      <h2>Featured Opportunities</h2>
+      <div id="featuredList" class="posts-grid"></div>
+    </section>
+
+    <section>
+      <h2>All Opportunities</h2>
+      <div id="opportunitiesList" class="posts-grid"></div>
+      <div id="pagination" style="margin-top:16px; text-align:center;"></div>
+    </section>
+  </div>
+
+  <script src="js/common.fixed.js"></script>
+  <script>
+    const OP_TYPES = ['International Internship','Semester Exchange','Student Exchange','Study Abroad','Scholarship','Fellowship','Summer School','Winter School','Research Opportunity','International Competition','Conference','Other'];
+    let debounceTimer;
+    function debounce(fn, delay) { clearTimeout(debounceTimer); debounceTimer = setTimeout(fn, delay); }
+
+    function populateFilters() {
+      const typeSel = document.getElementById('typeFilter');
+      OP_TYPES.forEach(t => typeSel.insertAdjacentHTML('beforeend', `<option value="${t}">${t}</option>`));
+    }
+
+    async function loadOpportunities(page = 1) {
+      const container = document.getElementById('opportunitiesList');
+      container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+      try {
+        const q = new URLSearchParams();
+        const search = document.getElementById('searchInput').value.trim();
+        if (search) q.set('search', search);
+        const type = document.getElementById('typeFilter').value; if (type) q.set('type', type);
+        const country = document.getElementById('countryFilter').value; if (country) q.set('country', country);
+        const deadline = document.getElementById('deadlineFilter').value; if (deadline) q.set('deadlineRange', deadline);
+        q.set('page', page);
+        q.set('limit', 20);
+        const res = await fetch(`${API_BASE}/opportunities?${q.toString()}`, { headers: authHeaders() });
+        const data = await res.json();
+        if (!res.ok) return container.innerHTML = '<div class="alert alert-error">Failed to load opportunities</div>';
+        if (!data.opportunities || data.opportunities.length === 0) return container.innerHTML = '<div class="empty-state"><h3>No opportunities found</h3></div>';
+        container.innerHTML = data.opportunities.map(o => `
+          <div class="post-card">
+            <h3>${escapeHtml(o.title)}</h3>
+            <div class="meta"><div>${escapeHtml(o.opportunityType)}</div><div>${o.partnerInstitution ? escapeHtml(o.partnerInstitution.name) : escapeHtml(o.country)}</div><div>Deadline: ${o.applicationDeadline ? formatDate(o.applicationDeadline) : '-'}</div></div>
+            <p>${escapeHtml(o.shortDescription || (o.description || '').substring(0,120))}...</p>
+            <div class="post-actions"><a class="btn btn-primary" href="opportunity-detail.html?id=${o._id}">View Details</a></div>
+          </div>
+        `).join('');
+
+        // featured list
+        const featured = data.opportunities.filter(x=>x.featured).slice(0,5);
+        const f = document.getElementById('featuredList');
+        f.innerHTML = featured.length ? featured.map(o => `
+          <div class="post-card">
+            <h4>${escapeHtml(o.title)}</h4>
+            <div class="meta"><div>${escapeHtml(o.opportunityType)}</div><div>${o.partnerInstitution ? escapeHtml(o.partnerInstitution.name) : escapeHtml(o.country)}</div></div>
+            <div><a class="btn btn-sm" href="opportunity-detail.html?id=${o._id}">Details</a></div>
+          </div>
+        `).join('') : '<div class="empty-state"><p>No featured opportunities</p></div>';
+
+        // pagination
+        const pagination = document.getElementById('pagination');
+        const total = data.total || data.count || 0; const pageSize = data.pageSize || 20;
+        const pages = Math.ceil(total / pageSize);
+        pagination.innerHTML = '';
+        if (pages > 1) {
+          for (let i=1;i<=pages;i++) pagination.insertAdjacentHTML('beforeend', `<button class="btn" onclick="loadOpportunities(${i})" ${i===page? 'disabled':''}>${i}</button>`);
+        }
+      } catch (err) { container.innerHTML = '<div class="alert alert-error">Failed to load</div>'; }
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{ populateFilters(); loadOpportunities(); });
+  </script>
+</body>
+</html>

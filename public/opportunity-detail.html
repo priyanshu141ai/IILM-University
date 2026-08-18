@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opportunity Details - IILM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="container">
+    <button onclick="history.back()" class="btn btn-light">← Back</button>
+    <div id="opportunityDetail"></div>
+  </div>
+
+  <script src="js/common.fixed.js"></script>
+  <script>
+    function getQueryParam(name) { const url = new URL(window.location.href); return url.searchParams.get(name); }
+    async function loadDetail() {
+      const id = getQueryParam('id');
+      const container = document.getElementById('opportunityDetail');
+      if (!id) return container.innerHTML = '<div class="alert alert-error">No opportunity specified</div>';
+      container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+      try {
+        const res = await fetch(`${API_BASE}/opportunities/${id}`, { headers: authHeaders() });
+        const data = await res.json();
+        if (!res.ok) return container.innerHTML = `<div class="alert alert-error">${escapeHtml(data.message)}</div>`;
+        const o = data.opportunity;
+        container.innerHTML = `
+          <h1>${escapeHtml(o.title)}</h1>
+          <div class="meta"><div>Type: ${escapeHtml(o.opportunityType)}</div><div>Partner: ${o.partnerInstitution ? escapeHtml(o.partnerInstitution.name) : escapeHtml(o.country)}</div><div>City: ${escapeHtml(o.city || '-')}</div></div>
+          <h3>Overview</h3>
+          <p>${escapeHtml(o.description || o.shortDescription || '')}</p>
+          <h3>Dates</h3>
+          <p>Application: ${o.applicationStartDate ? formatDate(o.applicationStartDate) : '-'} → ${o.applicationDeadline ? formatDate(o.applicationDeadline) : '-'}</p>
+          <p>Program: ${o.programStartDate ? formatDate(o.programStartDate) : '-'} → ${o.programEndDate ? formatDate(o.programEndDate) : '-'}</p>
+          <h3>Eligibility</h3>
+          <p>Programs: ${(o.eligiblePrograms||[]).join(', ') || '-'}</p>
+          <p>Departments: ${(o.eligibleDepartments||[]).join(', ') || '-'}</p>
+          <p>Years: ${(o.eligibleYears||[]).join(', ') || '-'}</p>
+          <p>Minimum CGPA: ${o.minimumCGPA|| '-'}</p>
+          <h3>Financial</h3>
+          <p>Funding: ${escapeHtml(o.fundingAmount || o.fundingType || '-')}</p>
+          <p>Fees: ${escapeHtml(o.fees || '-')}</p>
+          <h3>Application</h3>
+          <p>${escapeHtml(o.applicationInstructions || '-')}</p>
+          ${o.externalApplicationUrl ? `<p><a class="btn btn-primary" href="${escapeHtml(o.externalApplicationUrl)}" target="_blank" rel="noopener">Apply / Visit Application Portal</a></p>` : ''}
+          <h3>Documents</h3>
+          <div>${(o.documents||[]).map(d=>`<div><a href="${escapeHtml(d.url||'#')}">${escapeHtml(d.originalName||d.filename||'Document')}</a></div>`).join('') || '<p>-</p>'}</div>
+          <h3>Contact</h3>
+          <p>${escapeHtml(o.contactPerson||'-')} ${o.contactEmail?`<br/>Email: ${escapeHtml(o.contactEmail)}`:''} ${o.contactPhone?`<br/>Phone: ${escapeHtml(o.contactPhone)}`:''}</p>
+        `;
+      } catch (err) { container.innerHTML = '<div class="alert alert-error">Failed to load</div>'; }
+    }
+    loadDetail();
+  </script>
+</body>
+</html>
